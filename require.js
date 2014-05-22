@@ -7,15 +7,22 @@ var _moduleClass = function(){
 	dependList = {}, // modules that depend others
 	modules = {}, // save callbacks and require state.
 	last_require, last_define, la;
+	
+	var scriptsManager, actionManager;
 
-	this.setLastRequire = function(deps, callback){
+	this.init = function(sm, am){
+		scriptsManager = sm;
+		actionManager = am;
+	};
+
+	var setLastRequire = function(deps, callback){
 		last_require = {};
 		last_require['deps'] = deps;
 		last_require['callback'] = callback;
 		la = last_action['REQUIRE'];
 	};
 
-	this.setLastDefine = function(action){
+	var setLastDefine = function(action){
 		if(action.constructor == Function)
 			last_define = action();
 		else
@@ -23,27 +30,50 @@ var _moduleClass = function(){
 		la = last_action['DEFINE'];
 	}; 
 
+	this.dealRequire = function(deps, callback){
+		setLastRequire(deps, callback);
+		//set depend
+	};
+
+	this.dealDefine = function(callback){
+		setLastDefine(callback);
+	};
+
 	this.setModuleLoaded = function(name){
+		debugger;
 		if(la == last_action['DEFINE']){
 			modules[name] = last_define;
 			//release other modules.
 		}else{
-
+			//load depending modules
 		}
 	};
 };
 
-var _moduleAction = function(mm){
-	this.require = function(deps, callback){
-		mm.setLastRequire(deps, callback);
+var _moduleAction = function(){
+	var moduleManager;
+
+	this.init = function(mm){
+		moduleManager = mm;
 	};
+
+	this.require = function(deps, callback){
+		moduleManager.dealRequire(deps, callback);
+	};
+
 	this.define = function(callback){
-		mm.setLastDefine(callback);
+		moduleManager.dealDefine(callback);
 	};
 };
 
-var _scriptClass = function(mm){
+var _scriptClass = function(){
+	var moduleManager; 
 	var nameReg = /([^\/.]+).js$/;
+
+	this.init = function(mm){
+		moduleManager = mm;
+	};
+
 	this.loadScript = function(path){
 		debugger;
 		var script_name = nameReg.exec(path)[1];
@@ -53,15 +83,19 @@ var _scriptClass = function(mm){
 		document.head.appendChild(script);
 		script.onload = function(){
 			//send message to modules manager with name.
-			mm.setModuleLoaded(this.name);
+			moduleManager.setModuleLoaded(this.name);
 		};
 	};
 };
 
 (function(){
 	var _module_manager = new _moduleClass();
-	var _module_action = new _moduleAction(_module_manager);
-	var _scripts = new _scriptClass(_module_manager);
+	var _module_action = new _moduleAction();
+	var _scripts = new _scriptClass();
+	_module_manager.init(_scripts, _module_action);
+	_module_action.init(_module_manager);
+	_scripts.init(_module_manager);
+
 	if(!window['require'] && !window['define']){
 		window['require'] = _module_action.require;
 		window['define'] = _module_action.define;
